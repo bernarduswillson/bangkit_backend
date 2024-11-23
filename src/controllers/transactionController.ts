@@ -1,88 +1,11 @@
 import { Request, Response } from 'express';
+import { firestore } from '../utils/firestoreClient';
 
 // Model
 import { Transaction } from '../models/transaction';
 
-// Mock database
-let transactions: Transaction[] = [
-  {
-    user_id: "user_1",
-    items: [
-      {
-        product_id: "prod_1",
-        product_name: "Nasi Goreng Spesial",
-        quantity: 2,
-        price_per_unit: 25000,
-        total_price: 50000
-      },
-      {
-        product_id: "prod_2",
-        product_name: "Es Teh Manis",
-        quantity: 3,
-        price_per_unit: 10000,
-        total_price: 30000
-      },
-      {
-        product_id: "prod_3",
-        product_name: "Ayam Bakar",
-        quantity: 1,
-        price_per_unit: 45000,
-        total_price: 45000
-      }
-    ],
-    transaction_id: "txn_1",
-    timestamp: "2024-11-22T14:30:00Z",
-    total_price: 125000
-  },
-  {
-    user_id: "user_2",
-    items: [
-      {
-        product_id: "prod_4",
-        product_name: "Mie Ayam Spesial",
-        quantity: 2,
-        price_per_unit: 20000,
-        total_price: 40000
-      },
-      {
-        product_id: "prod_5",
-        product_name: "Es Jeruk",
-        quantity: 3,
-        price_per_unit: 10000,
-        total_price: 30000
-      }
-    ],
-    transaction_id: "txn_2",
-    timestamp: "2024-11-22T15:00:00Z",
-    total_price: 75000
-  },
-  {
-    user_id: "user_3",
-    items: [
-      {
-        product_id: "prod_6",
-        product_name: "Sate Ayam",
-        quantity: 5,
-        price_per_unit: 15000,
-        total_price: 75000
-      },
-      {
-        product_id: "prod_7",
-        product_name: "Es Campur",
-        quantity: 2,
-        price_per_unit: 12500,
-        total_price: 25000
-      }
-    ],
-    transaction_id: "txn_3",
-    timestamp: "2024-11-22T16:00:00Z",
-    total_price: 100000
-  }
-];
-
-
 // Create a transaction
-export const createTransaction = (req: Request, res: Response) => {
+export const createTransaction = async (req: Request, res: Response) => {
   const transaction: Omit<Transaction, 'transaction_id'> = req.body;
 
   // Validate required fields
@@ -93,104 +16,158 @@ export const createTransaction = (req: Request, res: Response) => {
     });
   }
 
-  // Generate a new transaction ID
-  const lastTransaction = transactions[transactions.length - 1];
-  const newTransactionId = lastTransaction ? `txn_${parseInt(lastTransaction.transaction_id.split('_')[1]) + 1}` : 'txn_1';
+  try {
+    // Generate a new transaction ID
+    const transactionsRef = firestore.collection('transactions');
+    const lastTransactionSnapshot = await transactionsRef.orderBy('timestamp', 'desc').limit(1).get();
+    const newTransactionId = lastTransactionSnapshot.empty ? 'txn_1' : `txn_${parseInt(lastTransactionSnapshot.docs[0].id.split('_')[1]) + 1}`;
 
-  const newTransaction: Transaction = {
-    ...transaction,
-    transaction_id: newTransactionId,
-    timestamp: new Date().toISOString(),
-    total_price: transaction.items.reduce((total, item) => total + item.total_price, 0)
-  };
-  transactions.push(newTransaction);
+    const newTransaction: Transaction = {
+      ...transaction,
+      transaction_id: newTransactionId,
+      timestamp: new Date().toISOString(),
+      total_price: transaction.items.reduce((total, item) => total + item.total_price, 0)
+    };
 
-  res.status(201).json({
-    status: "success",
-    message: "Transaction created successfully",
-    data: newTransaction
-  });
+    await transactionsRef.doc(newTransactionId).set(newTransaction);
+
+    res.status(201).json({
+      status: "success",
+      message: "Transaction created successfully",
+      data: newTransaction
+    });
+  } catch (error) {
+    console.error("Error creating transaction:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to create transaction",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
+    });
+  }
 };
 
 
 // Get all transactions
-export const getTransactions = (req: Request, res: Response) => {
-  res.json({
-    status: "success",
-    message: "Transactions retrieved successfully",
-    data: {
-      transactions: transactions,
-      meta: {
-        total: transactions.length
+export const getTransactions = async (req: Request, res: Response) => {
+  try {
+    const transactionsRef = firestore.collection('transactions');
+    const snapshot = await transactionsRef.get();
+    const transactions: Transaction[] = snapshot.docs.map(doc => doc.data() as Transaction);
+
+    res.json({
+      status: "success",
+      message: "Transactions retrieved successfully",
+      data: {
+        transactions: transactions,
+        meta: {
+          total: transactions.length
+        }
       }
-    }
-  });
+    });
+  } catch (error) {
+    console.error("Error retrieving transactions:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to retrieve transactions",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
+    });
+  }
 };
 
 
 // Get a transaction by ID
-export const getTransactionById = (req: Request, res: Response) => {
+export const getTransactionById = async (req: Request, res: Response) => {
   const { id } = req.params;
-  // Find the transaction by ID
-  const transaction = transactions.find(t => t.transaction_id === id);
-  if (transaction) {
-    res.json({
-      status: "success",
-      message: "Transaction retrieved successfully",
-      data: transaction
-    });
-  } else {
-    res.status(404).json({
+  try {
+    const transactionRef = firestore.collection('transactions').doc(id);
+    const transactionDoc = await transactionRef.get();
+
+    if (transactionDoc.exists) {
+      res.json({
+        status: "success",
+        message: "Transaction retrieved successfully",
+        data: transactionDoc.data()
+      });
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "Transaction not found",
+        error_code: "TRANSACTION_NOT_FOUND"
+      });
+    }
+  } catch (error) {
+    console.error("Error retrieving transaction:", error);
+    res.status(500).json({
       status: "error",
-      message: "Transaction not found",
-      error_code: "TRANSACTION_NOT_FOUND"
+      message: "Failed to retrieve transaction",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
     });
   }
 };
 
 
 // Update a transaction
-export const updateTransaction = (req: Request, res: Response) => {
+export const updateTransaction = async (req: Request, res: Response) => {
   const { id } = req.params;
-  // Find the transaction by ID
-  const index = transactions.findIndex(t => t.transaction_id === id);
+  try {
+    const transactionRef = firestore.collection('transactions').doc(id);
+    const transactionDoc = await transactionRef.get();
 
-  if (index !== -1) {
-    if (req.body.items) {
-      transactions[index].items = req.body.items;
-      // Update the total price
-      transactions[index].total_price = transactions[index].items.reduce((total, item) => total + item.total_price, 0);
+    if (transactionDoc.exists) {
+      const updatedData = req.body;
+
+      if (updatedData.items) {
+        updatedData.total_price = updatedData.items.reduce((total: number, item: { total_price: number }) => total + item.total_price, 0);
+      }
+
+      await transactionRef.update(updatedData);
+
+      res.json({
+        status: "success",
+        message: "Transaction updated successfully",
+        data: { ...transactionDoc.data(), ...updatedData }
+      });
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "Transaction not found",
+        error_code: "TRANSACTION_NOT_FOUND"
+      });
     }
-
-    res.json({
-      status: "success",
-      message: "Transaction updated successfully",
-      data: transactions[index]
-    });
-  } else {
-    res.status(404).json({
+  } catch (error) {
+    console.error("Error updating transaction:", error);
+    res.status(500).json({
       status: "error",
-      message: "Transaction not found",
-      error_code: "TRANSACTION_NOT_FOUND"
+      message: "Failed to update transaction",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
     });
   }
 };
 
 
 // Delete a transaction
-export const deleteTransaction = (req: Request, res: Response) => {
+export const deleteTransaction = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const initialLength = transactions.length;
-  // Filter out the transaction by ID
-  transactions = transactions.filter(t => t.transaction_id !== id);
-  
-  if (transactions.length < initialLength) {
-    res.status(204).send();
-  } else {
-    res.status(404).json({
+  try {
+    const transactionRef = firestore.collection('transactions').doc(id);
+    const transactionDoc = await transactionRef.get();
+
+    if (transactionDoc.exists) {
+      await transactionRef.delete();
+      res.status(204).send();
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "Transaction not found",
+        error_code: "TRANSACTION_NOT_FOUND"
+      });
+    }
+  } catch (error) {
+    console.error("Error deleting transaction:", error);
+    res.status(500).json({
       status: "error",
-      message: "Transaction not found",
-      error_code: "TRANSACTION_NOT_FOUND"
+      message: "Failed to delete transaction",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
     });
   }
 };
