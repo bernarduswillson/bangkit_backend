@@ -1,12 +1,21 @@
 import { Firestore } from '@google-cloud/firestore';
-import path from 'path';
+import process from 'process';
+// import path from 'path';
 
 // Initialize Firestore
 export const firestore = new Firestore({
-  projectId: 'capstone-project-442502',
-  // eslint-disable-next-line no-undef
-  keyFilename: path.join(__dirname, 'service-account.json'),
-  databaseId: 'bangkit-db'
+  // IF YOU ARE RUNNING THIS LOCALLY
+  // projectId: 'capstone-project-442502',
+  // // eslint-disable-next-line no-undef
+  // keyFilename: path.join(__dirname, 'service-account.json'),
+  // databaseId: 'bangkit-db'
+
+  // IF YOU ARE RUNNING THIS ON GOOGLE CLOUD
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL,
+    private_key: (process.env.GOOGLE_CLOUD_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  },
 });
 
 // Save a document to a collection

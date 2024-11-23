@@ -20,6 +20,8 @@ steps:
       - $_DEPLOY_REGION
       - '--platform'
       - $_PLATFORM
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT_ID=$_GOOGLE_CLOUD_PROJECT_ID,GOOGLE_CLOUD_CLIENT_EMAIL=$_GOOGLE_CLOUD_CLIENT_EMAIL,GOOGLE_CLOUD_PRIVATE_KEY=$_GOOGLE_CLOUD_PRIVATE_KEY'
     entrypoint: gcloud
 timeout: 1200s
 images:
