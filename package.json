@@ -7,13 +7,15 @@
     "start": "tsc && node dist/app.js",
     "dev": "nodemon",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "seed": "ts-node src/seed.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "firebase-admin": "^13.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
