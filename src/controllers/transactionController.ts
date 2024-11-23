@@ -1,7 +1,9 @@
-// Imports
 import { Request, Response } from 'express';
+
+// Model
 import { Transaction } from '../models/transaction';
 
+// Mock database
 let transactions: Transaction[] = [
   {
     user_id: "user_1",
@@ -78,9 +80,11 @@ let transactions: Transaction[] = [
   }
 ];
 
+
 // Create a transaction
 export const createTransaction = (req: Request, res: Response) => {
   const transaction: Omit<Transaction, 'transaction_id'> = req.body;
+
   // Validate required fields
   if (!transaction.user_id || !transaction.items) {
     res.status(400).json({
@@ -99,8 +103,8 @@ export const createTransaction = (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     total_price: transaction.items.reduce((total, item) => total + item.total_price, 0)
   };
-
   transactions.push(newTransaction);
+
   res.status(201).json({
     status: "success",
     message: "Transaction created successfully",
@@ -123,6 +127,7 @@ export const getTransactions = (req: Request, res: Response) => {
   });
 };
 
+
 // Get a transaction by ID
 export const getTransactionById = (req: Request, res: Response) => {
   const { id } = req.params;
@@ -142,6 +147,7 @@ export const getTransactionById = (req: Request, res: Response) => {
     });
   }
 };
+
 
 // Update a transaction
 export const updateTransaction = (req: Request, res: Response) => {

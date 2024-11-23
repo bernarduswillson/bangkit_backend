@@ -1,5 +1,6 @@
-// Imports
 import { Router } from 'express';
+
+// Controllers
 import {
   createTransaction,
   getTransactions,
