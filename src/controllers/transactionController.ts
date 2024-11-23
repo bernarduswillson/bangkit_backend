@@ -4,6 +4,7 @@ import { firestore } from '../utils/firestoreClient';
 // Model
 import { Transaction } from '../models/transaction';
 
+
 // Create a transaction
 export const createTransaction = async (req: Request, res: Response) => {
   const transaction: Omit<Transaction, 'transaction_id'> = req.body;

@@ -1,57 +1,12 @@
 import { Request, Response } from 'express';
+import { firestore } from '../utils/firestoreClient';
 
 // Model
 import { Product } from '../models/product';
 
-// Mock database
-let products: Product[] = [
-  {
-    user_id: "user_1",
-    product_id: "prod_1",
-    product_name: "Nasi Goreng Spesial",
-    price: 25000
-  },
-  {
-    user_id: "user_1",
-    product_id: "prod_2",
-    product_name: "Es Teh Manis",
-    price: 10000
-  },
-  {
-    user_id: "user_1",
-    product_id: "prod_3",
-    product_name: "Ayam Bakar",
-    price: 45000
-  },
-  {
-    user_id: "user_2",
-    product_id: "prod_4",
-    product_name: "Mie Ayam Spesial",
-    price: 20000
-  },
-  {
-    user_id: "user_2",
-    product_id: "prod_5",
-    product_name: "Es Jeruk",
-    price: 10000
-  },
-  {
-    user_id: "user_3",
-    product_id: "prod_6",
-    product_name: "Nasi Uduk",
-    price: 20000
-  },
-  {
-    user_id: "user_3",
-    product_id: "prod_7",
-    product_name: "Es Campur",
-    price: 15000
-  }
-];
-
 
 // Create a product
-export const createProduct = (req: Request, res: Response) => {
+export const createProduct = async (req: Request, res: Response) => {
   const product: Omit<Product, 'product_id'> = req.body;
 
   // Validate required fields
@@ -62,102 +17,155 @@ export const createProduct = (req: Request, res: Response) => {
     });
   }
 
-  // Generate a new product ID
-  const lastProduct = products[products.length - 1];
-  const newProductId = lastProduct ? `prod_${parseInt(lastProduct.product_id.split('_')[1]) + 1}` : 'prod_1';
+  try {
+    // Generate a new product ID
+    const productsRef = firestore.collection('products');
+    const lastProductSnapshot = await productsRef.orderBy('product_id', 'desc').limit(1).get();
+    const newProductId = lastProductSnapshot.empty ? 'prod_1' : `prod_${parseInt(lastProductSnapshot.docs[0].id.split('_')[1]) + 1}`;
 
-  const newProduct: Product = {
-    ...product,
-    product_id: newProductId
-  };
-  products.push(newProduct);
+    const newProduct: Product = {
+      ...product,
+      product_id: newProductId
+    };
 
-  res.status(201).json({
-    status: "success",
-    message: "Product created successfully",
-    data: newProduct
-  });
+    await productsRef.doc(newProductId).set(newProduct);
+
+    res.status(201).json({
+      status: "success",
+      message: "Product created successfully",
+      data: newProduct
+    });
+  } catch (error) {
+    console.error("Error creating product:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to create product",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
+    });
+  }
 };
 
 
 // Get all products
-export const getProducts = (req: Request, res: Response) => {
-  res.json({
-    status: "success",
-    message: "Products retrieved successfully",
-    data: {
-      products: products,
-      meta: {
-        total: products.length
+export const getProducts = async (req: Request, res: Response) => {
+  try {
+    const productsRef = firestore.collection('products');
+    const snapshot = await productsRef.get();
+    const products: Product[] = snapshot.docs.map(doc => doc.data() as Product);
+
+    res.json({
+      status: "success",
+      message: "Products retrieved successfully",
+      data: {
+        products: products,
+        meta: {
+          total: products.length
+        }
       }
-    }
-  })
+    });
+  } catch (error) {
+    console.error("Error retrieving products:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to retrieve products",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
+    });
+  }
 };
 
 
 // Get a product by ID
-export const getProductById = (req: Request, res: Response) => {
+export const getProductById = async (req: Request, res: Response) => {
   const { id } = req.params;
-  // Find the product by ID
-  const product = products.find(p => p.product_id === id);
-  if (product) {
-    res.json({
-      status: "success",
-      message: "Product retrieved successfully",
-      data: product
-    })
-  } else {
-    res.status(404).json({
+  try {
+    const productRef = firestore.collection('products').doc(id);
+    const productDoc = await productRef.get();
+
+    if (productDoc.exists) {
+      res.json({
+        status: "success",
+        message: "Product retrieved successfully",
+        data: productDoc.data()
+      });
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "Product not found",
+        error_code: "PRODUCT_NOT_FOUND"
+      });
+    }
+  } catch (error) {
+    console.error("Error retrieving product:", error);
+    res.status(500).json({
       status: "error",
-      message: "Product not found",
-      error_code: "PRODUCT_NOT_FOUND"
-    })
+      message: "Failed to retrieve product",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
+    });
   }
 };
 
 
 // Update a product
-export const updateProduct = (req: Request, res: Response) => {
+export const updateProduct = async (req: Request, res: Response) => {
   const { id } = req.params;
-  // Find the product by ID
-  const index = products.findIndex(p => p.product_id === id);
+  try {
+    const productRef = firestore.collection('products').doc(id);
+    const productDoc = await productRef.get();
 
-  if (index !== -1) {
-    const { product_name, price } = req.body;
-    if (product_name && price) {
-      products[index].product_name = product_name;
-      products[index].price = price;
+    if (productDoc.exists) {
+      const updatedData = req.body;
+
+      // Update the product fields
+      await productRef.update(updatedData);
+
+      // Retrieve the updated product
+      const updatedProduct = await productRef.get();
+      res.json({
+        status: "success",
+        message: "Product updated successfully",
+        data: updatedProduct.data()
+      });
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "Product not found",
+        error_code: "PRODUCT_NOT_FOUND"
+      });
     }
-
-    res.json({
-      status: "success",
-      message: "Product updated successfully",
-      data: products[index]
-    });
-  } else {
-    res.status(404).json({
+  } catch (error) {
+    console.error("Error updating product:", error);
+    res.status(500).json({
       status: "error",
-      message: "Product not found",
-      error_code: "PRODUCT_NOT_FOUND"
+      message: "Failed to update product",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
     });
   }
 };
 
 
 // Delete a product
-export const deleteProduct = (req: Request, res: Response) => {
+export const deleteProduct = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const initialLength = products.length;
-  // Filter out the product by ID
-  products = products.filter(p => p.product_id !== id);
+  try {
+    const productRef = firestore.collection('products').doc(id);
+    const productDoc = await productRef.get();
 
-  if (products.length < initialLength) {
-    res.status(204).send();
-  } else {
-    res.status(404).json({
+    if (productDoc.exists) {
+      await productRef.delete();
+      res.status(204).send();
+    } else {
+      res.status(404).json({
+        status: "error",
+        message: "Product not found",
+        error_code: "PRODUCT_NOT_FOUND"
+      });
+    }
+  } catch (error) {
+    console.error("Error deleting product:", error);
+    res.status(500).json({
       status: "error",
-      message: "Product not found",
-      error_code: "PRODUCT_NOT_FOUND"
+      message: "Failed to delete product",
+      error: (error instanceof Error) ? error.message : 'Unknown error'
     });
   }
 };
