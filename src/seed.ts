@@ -1,4 +1,4 @@
-import { firestore } from './utils/firestoreClient';
+import { firestore } from './config/firestore';
 import { Transaction } from './models/transaction';
 import { Product } from './models/product';
 

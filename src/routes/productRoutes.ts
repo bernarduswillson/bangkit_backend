@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { authMiddleware } from '../middleware/authMiddleware';
 
 // Controllers
 import {
@@ -12,10 +13,10 @@ import {
 const router = Router();
 
 // Routes
-router.post('/', createProduct);
-router.get('/', getProducts);
-router.get('/:id', getProductById);
-router.put('/:id', updateProduct);
-router.delete('/:id', deleteProduct);
+router.post('/', authMiddleware, createProduct);
+router.get('/', authMiddleware, getProducts);
+router.get('/:id', authMiddleware, getProductById);
+router.put('/:id', authMiddleware, updateProduct);
+router.delete('/:id', authMiddleware, deleteProduct);
 
 export default router;
