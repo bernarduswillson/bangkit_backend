@@ -22,6 +22,7 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
       status: 'error',
       message: 'user_id and image are required.',
     });
+    return;
   }
 
   try {
@@ -47,6 +48,7 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
       message: response.data.message,
       data: response.data.data,
     });
+    return;
   } catch (error) {
     console.error('Error in OCR transaction:', error);
     res.status(500).json({
@@ -54,6 +56,7 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
       message: 'Failed to process OCR transaction.',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+    return;
   }
 };
 
@@ -68,6 +71,7 @@ export const createTransaction = async (req: Request, res: Response) => {
       status: "error",
       message: "Missing required fields: user_id or items."
     });
+    return;
   }
 
   try {
@@ -90,6 +94,7 @@ export const createTransaction = async (req: Request, res: Response) => {
       message: "Transaction created successfully",
       data: newTransaction
     });
+    return;
   } catch (error) {
     console.error("Error creating transaction:", error);
     res.status(500).json({
@@ -97,6 +102,7 @@ export const createTransaction = async (req: Request, res: Response) => {
       message: "Failed to create transaction",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -118,6 +124,7 @@ export const getTransactions = async (req: Request, res: Response) => {
         }
       }
     });
+    return;
   } catch (error) {
     console.error("Error retrieving transactions:", error);
     res.status(500).json({
@@ -125,6 +132,7 @@ export const getTransactions = async (req: Request, res: Response) => {
       message: "Failed to retrieve transactions",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -149,6 +157,7 @@ export const getTransactionById = async (req: Request, res: Response) => {
         error_code: "TRANSACTION_NOT_FOUND"
       });
     }
+    return;
   } catch (error) {
     console.error("Error retrieving transaction:", error);
     res.status(500).json({
@@ -156,6 +165,7 @@ export const getTransactionById = async (req: Request, res: Response) => {
       message: "Failed to retrieve transaction",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 

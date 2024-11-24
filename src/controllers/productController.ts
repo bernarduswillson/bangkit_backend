@@ -15,6 +15,7 @@ export const createProduct = async (req: Request, res: Response) => {
       status: "error",
       message: "Missing required fields: user_id, product_name, or price."
     });
+    return;
   }
 
   try {
@@ -35,6 +36,7 @@ export const createProduct = async (req: Request, res: Response) => {
       message: "Product created successfully",
       data: newProduct
     });
+    return;
   } catch (error) {
     console.error("Error creating product:", error);
     res.status(500).json({
@@ -42,6 +44,7 @@ export const createProduct = async (req: Request, res: Response) => {
       message: "Failed to create product",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -63,6 +66,7 @@ export const getProducts = async (req: Request, res: Response) => {
         }
       }
     });
+    return;
   } catch (error) {
     console.error("Error retrieving products:", error);
     res.status(500).json({
@@ -70,6 +74,7 @@ export const getProducts = async (req: Request, res: Response) => {
       message: "Failed to retrieve products",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -94,6 +99,7 @@ export const getProductById = async (req: Request, res: Response) => {
         error_code: "PRODUCT_NOT_FOUND"
       });
     }
+    return;
   } catch (error) {
     console.error("Error retrieving product:", error);
     res.status(500).json({
@@ -101,6 +107,7 @@ export const getProductById = async (req: Request, res: Response) => {
       message: "Failed to retrieve product",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -132,6 +139,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         error_code: "PRODUCT_NOT_FOUND"
       });
     }
+    return;
   } catch (error) {
     console.error("Error updating product:", error);
     res.status(500).json({
@@ -139,6 +147,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       message: "Failed to update product",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -160,6 +169,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
         error_code: "PRODUCT_NOT_FOUND"
       });
     }
+    return;
   } catch (error) {
     console.error("Error deleting product:", error);
     res.status(500).json({
@@ -167,5 +177,6 @@ export const deleteProduct = async (req: Request, res: Response) => {
       message: "Failed to delete product",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };

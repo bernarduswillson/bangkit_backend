@@ -43,6 +43,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       message: 'User registered successfully',
       user: newUser,
     });
+    return;
   } catch (error) {
     console.error("Error during registration:", error);
     res.status(500).json({
@@ -50,6 +51,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       message: 'Failed to register user.',
       error: (error instanceof Error) ? error.message : 'Unknown error',
     });
+    return;
   }
 };
 
@@ -84,11 +86,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       token: `Bearer ${idToken}`,
       user: decodedToken,
     });
+    return;
   } catch (error) {
     console.error("Error during login:", error);
     res.status(401).json({
       status: 'error',
       message: 'Invalid email or password.',
     });
+    return;
   }
 };
