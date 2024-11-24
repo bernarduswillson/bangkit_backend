@@ -1,8 +1,61 @@
 import { Request, Response } from 'express';
 import { firestore } from '../config/firestore';
+import axios from 'axios';
+import process from 'process';
+
+interface MulterRequest extends Request {
+  // eslint-disable-next-line no-undef
+  file?: Express.Multer.File;
+}
 
 // Model
 import { Transaction } from '../models/transaction';
+
+
+// OCR transaction
+export const ocrTransaction = async (req: MulterRequest, res: Response) => {
+  const { user_id } = req.body;
+  const image = req.file;
+
+  if (!user_id || !image) {
+    res.status(400).json({
+      status: 'error',
+      message: 'user_id and image are required.',
+    });
+  }
+
+  try {
+    const imageBuffer = image?.buffer;
+
+    const formData = new FormData();
+    formData.append('user_id', user_id);
+    if (imageBuffer) {
+      const blob = new Blob([imageBuffer], { type: 'image/jpeg' });
+      formData.append('image', blob, image.originalname);
+    } else {
+      throw new Error('Image buffer is undefined');
+    }
+
+    // Send image to OCR API
+    const response = await axios.post(
+      `${process.env.OCR_API_URL}/api/v1/receipt/inference`,
+      formData
+    );
+
+    res.status(200).json({
+      status: response.data.status,
+      message: response.data.message,
+      data: response.data.data,
+    });
+  } catch (error) {
+    console.error('Error in OCR transaction:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to process OCR transaction.',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
 
 
 // Create a transaction

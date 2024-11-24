@@ -1,13 +1,15 @@
 import { Router } from 'express';
+import { upload } from '../config/multer';
 import { authMiddleware } from '../middleware/authMiddleware';
 
 // Controllers
 import {
+  ocrTransaction,
   createTransaction,
   getTransactions,
   getTransactionById,
   updateTransaction,
-  deleteTransaction
+  deleteTransaction,
 } from '../controllers/transactionController';
 
 const router = Router();
@@ -18,5 +20,6 @@ router.get('/', authMiddleware, getTransactions);
 router.get('/:id', authMiddleware, getTransactionById);
 router.put('/:id', authMiddleware, updateTransaction);
 router.delete('/:id', authMiddleware, deleteTransaction);
+router.post('/ocr', authMiddleware, upload.single('image'), ocrTransaction);
 
 export default router;
