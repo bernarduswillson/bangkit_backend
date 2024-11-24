@@ -2,6 +2,10 @@ import { Request, Response } from 'express';
 import { firestore } from '../config/firestore';
 import { firebase, verifyIdToken } from '../config/fireauth';
 
+// Model
+import { User } from '../models/user';
+
+
 // Register
 export const register = async (req: Request, res: Response): Promise<void> => {
   const { name, email, password, address } = req.body;
@@ -24,7 +28,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
     const uid = userCredential.user.uid;
 
-    const newUser = {
+    const newUser : User = {
       user_id: uid,
       name,
       email,
