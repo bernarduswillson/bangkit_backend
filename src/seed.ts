@@ -1,8 +1,13 @@
 import { firestore } from './config/firestore';
+import { User } from './models/user';
 import { Transaction } from './models/transaction';
 import { Product } from './models/product';
 
 // Sample data
+let users: User[] = [
+  { user_id: "user_1", name: "Alice", email: "alice@gmail.com", address: "123 Wonderland" },
+];
+
 let transactions: Transaction[] = [
   {
     user_id: "user_1",
@@ -16,7 +21,7 @@ let transactions: Transaction[] = [
     ],
   },
   {
-    user_id: "user_2",
+    user_id: "user_1",
     transaction_id: "txn_2",
     timestamp: "2024-11-22T15:00:00Z",
     total_price: 75000,
@@ -26,7 +31,7 @@ let transactions: Transaction[] = [
     ],
   },
   {
-    user_id: "user_3",
+    user_id: "user_1",
     transaction_id: "txn_3",
     timestamp: "2024-11-22T16:00:00Z",
     total_price: 100000,
@@ -41,37 +46,76 @@ let products: Product[] = [
   { user_id: "user_1", product_id: "prod_1", product_name: "Nasi Goreng Spesial", price: 25000 },
   { user_id: "user_1", product_id: "prod_2", product_name: "Es Teh Manis", price: 10000 },
   { user_id: "user_1", product_id: "prod_3", product_name: "Ayam Bakar", price: 45000 },
-  { user_id: "user_2", product_id: "prod_4", product_name: "Mie Ayam Spesial", price: 20000 },
-  { user_id: "user_2", product_id: "prod_5", product_name: "Es Jeruk", price: 10000 },
-  { user_id: "user_3", product_id: "prod_6", product_name: "Sate Ayam", price: 15000 },
-  { user_id: "user_3", product_id: "prod_7", product_name: "Es Campur", price: 12500 },
+  { user_id: "user_1", product_id: "prod_4", product_name: "Mie Ayam Spesial", price: 20000 },
+  { user_id: "user_1", product_id: "prod_5", product_name: "Es Jeruk", price: 10000 },
+  { user_id: "user_1", product_id: "prod_6", product_name: "Sate Ayam", price: 15000 },
+  { user_id: "user_1", product_id: "prod_7", product_name: "Es Campur", price: 12500 },
 ];
 
+const seedUsers = async () => {
+  for (const user of users) {
+    if (user.user_id) {
+      await firestore.collection("users").doc(user.user_id).set({
+        name: user.name,
+        email: user.email,
+        address: user.address,
+      });
+    } else {
+      console.error("User ID is undefined for user:", user);
+    }
+    console.log(`User ${user.user_id} added.`);
+  }
+};
+
 const seedTransactions = async () => {
-  const collection = firestore.collection("transactions");
   for (const transaction of transactions) {
-    const docRef = collection.doc(transaction.transaction_id);
-    await docRef.set(transaction);
-    console.log(`Transaction ${transaction.transaction_id} added`);
+    const userDoc = firestore.collection("users").doc(transaction.user_id);
+    const transactionsCollection = userDoc.collection("transactions");
+    const transactionDoc = transactionsCollection.doc(transaction.transaction_id);
+
+    await transactionDoc.set({
+      timestamp: transaction.timestamp,
+      total_price: transaction.total_price,
+    });
+
+    const itemsCollection = transactionDoc.collection("items");
+    for (const item of transaction.items) {
+      const itemDoc = itemsCollection.doc(item.product_id);
+      await itemDoc.set({
+        product_name: item.product_name,
+        quantity: item.quantity,
+        price_per_unit: item.price_per_unit,
+        total_price: item.total_price
+      });
+    }
+
+    console.log(`Transaction ${transaction.transaction_id} added for user ${transaction.user_id}`);
   }
 };
 
 const seedProducts = async () => {
-  const collection = firestore.collection("products");
   for (const product of products) {
-    const docRef = collection.doc(product.product_id);
-    await docRef.set(product);
-    console.log(`Product ${product.product_id} added`);
+    const userDoc = firestore.collection("users").doc(product.user_id);
+    const productsCollection = userDoc.collection("products");
+    const productDoc = productsCollection.doc(product.product_id);
+
+    await productDoc.set({
+      product_name: product.product_name,
+      price: product.price,
+    });
+
+    console.log(`Product ${product.product_id} added for user ${product.user_id}`);
   }
 };
 
-
 const seed = async () => {
   try {
-    console.log("Seeding transactions...");
-    await seedTransactions();
+    console.log("Seeding users...");
+    await seedUsers();
     console.log("Seeding products...");
     await seedProducts();
+    console.log("Seeding transactions...");
+    await seedTransactions();
     console.log("Seeding completed.");
   } catch (error) {
     console.error("Error seeding data:", error);

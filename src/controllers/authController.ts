@@ -14,7 +14,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   if ( !name || !email || !password || !address) {
     res.status(400).json({
       status: 'error',
-      message: 'All fields (user_id, name, email, password, address) are required.',
+      message: 'All fields (name, email, password, address) are required.',
     });
     return;
   }
@@ -29,7 +29,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const uid = userCredential.user.uid;
 
     const newUser : User = {
-      user_id: uid,
       name,
       email,
       address,
