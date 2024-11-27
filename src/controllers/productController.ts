@@ -7,34 +7,46 @@ import { Product } from '../models/product';
 
 // Create a product
 export const createProduct = async (req: Request, res: Response) => {
-  const product: Omit<Product, 'product_id'> = req.body;
+  const { user_id, product_name, price } = req.body;
 
   // Validate required fields
-  if (!product.user_id || !product.product_name || product.price === undefined) {
+  if (!product_name || price === undefined) {
     res.status(400).json({
       status: "error",
-      message: "Missing required fields: user_id, product_name, or price."
+      message: "Missing required fields: product_name or price."
     });
     return;
   }
 
   try {
-    // Generate a new product ID
-    const productsRef = firestore.collection('products');
-    const lastProductSnapshot = await productsRef.orderBy('product_id', 'desc').limit(1).get();
-    const newProductId = lastProductSnapshot.empty ? 'prod_1' : `prod_${parseInt(lastProductSnapshot.docs[0].id.split('_')[1]) + 1}`;
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `${user_id} not found`,
+      });
+      return;
+    }
 
+    // Users/products collection
     const newProduct: Product = {
-      ...product,
-      product_id: newProductId
+      product_name,
+      price,
     };
 
-    await productsRef.doc(newProductId).set(newProduct);
+    // Add product
+    const productRef = await userDoc.collection("products").add(newProduct);
 
+    const productId = productRef.id;
     res.status(201).json({
       status: "success",
       message: "Product created successfully",
-      data: newProduct
+      data: {
+        product_id: productId,
+        ...newProduct
+      }
     });
     return;
   } catch (error) {
@@ -45,16 +57,35 @@ export const createProduct = async (req: Request, res: Response) => {
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
     return;
-  }
+  };
 };
 
 
 // Get all products
 export const getProducts = async (req: Request, res: Response) => {
+  const { user_id } = req.body;
+  
   try {
-    const productsRef = firestore.collection('products');
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/products collection
+    const productsRef = userDoc.collection('products');
     const snapshot = await productsRef.get();
-    const products: Product[] = snapshot.docs.map(doc => doc.data() as Product);
+
+    // Retrieve products
+    const products: Product[] = snapshot.docs.map(doc => ({
+      product_id: doc.id,
+      ...doc.data() as Product
+    }));
 
     res.json({
       status: "success",
@@ -82,15 +113,36 @@ export const getProducts = async (req: Request, res: Response) => {
 // Get a product by ID
 export const getProductById = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { user_id } = req.body;
+
   try {
-    const productRef = firestore.collection('products').doc(id);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/products collection
+    const productRef = userDoc.collection('products').doc(id);
     const productDoc = await productRef.get();
 
     if (productDoc.exists) {
+      // Retrieve product
+      const productData = productDoc.data() as Product;
+
       res.json({
         status: "success",
         message: "Product retrieved successfully",
-        data: productDoc.data()
+        data: {
+          product: {
+            ...productData,
+          }
+        }
       });
     } else {
       res.status(404).json({
@@ -115,18 +167,44 @@ export const getProductById = async (req: Request, res: Response) => {
 // Update a product
 export const updateProduct = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { user_id, product_name, price } = req.body;
+
+  // Validate required fields
+  if (!product_name || price === undefined) {
+    res.status(400).json({
+      status: "error",
+      message: "Missing required fields: product_name or price."
+    });
+    return;
+  }
+
   try {
-    const productRef = firestore.collection('products').doc(id);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/products collection
+    const productRef = userDoc.collection('products').doc(id);
     const productDoc = await productRef.get();
 
     if (productDoc.exists) {
-      const updatedData = req.body;
-
-      // Update the product fields
+      // Update product
+      const updatedData: Partial<Product> = {
+        product_name,
+        price,
+      };
       await productRef.update(updatedData);
 
-      // Retrieve the updated product
+      // Retrieve updated product
       const updatedProduct = await productRef.get();
+
       res.json({
         status: "success",
         message: "Product updated successfully",
@@ -155,12 +233,28 @@ export const updateProduct = async (req: Request, res: Response) => {
 // Delete a product
 export const deleteProduct = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { user_id } = req.body;
+
   try {
-    const productRef = firestore.collection('products').doc(id);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/products collection
+    const productRef = userDoc.collection('products').doc(id);
     const productDoc = await productRef.get();
 
     if (productDoc.exists) {
+      // Delete product
       await productRef.delete();
+
       res.status(204).send();
     } else {
       res.status(404).json({

@@ -1,23 +1,20 @@
 import { firestore } from './config/firestore';
-import { User } from './models/user';
-import { Transaction } from './models/transaction';
-import { Product } from './models/product';
 
 // Sample data
-let users: User[] = [
+let users = [
   { user_id: "user_1", name: "Alice", email: "alice@gmail.com", address: "123 Wonderland" },
 ];
 
-let transactions: Transaction[] = [
+let transactions = [
   {
     user_id: "user_1",
     transaction_id: "txn_1",
     timestamp: "2024-11-22T14:30:00Z",
     total_price: 125000,
     items: [
-      { product_id: "prod_1", product_name: "Nasi Goreng Spesial", quantity: 2, price_per_unit: 25000, total_price: 50000 },
-      { product_id: "prod_2", product_name: "Es Teh Manis", quantity: 3, price_per_unit: 10000, total_price: 30000 },
-      { product_id: "prod_3", product_name: "Ayam Bakar", quantity: 1, price_per_unit: 45000, total_price: 45000 },
+      { product: { user_id: "user_1", product_id: "prod_1", product_name: "Nasi Goreng Spesial", price: 25000 }, quantity: 2, total_price: 50000 },
+      { product: { user_id: "user_1", product_id: "prod_2", product_name: "Es Teh Manis", price: 10000 }, quantity: 3, total_price: 30000 },
+      { product: { user_id: "user_1", product_id: "prod_3", product_name: "Ayam Bakar", price: 45000 }, quantity: 1, total_price: 45000 },
     ],
   },
   {
@@ -26,8 +23,8 @@ let transactions: Transaction[] = [
     timestamp: "2024-11-22T15:00:00Z",
     total_price: 75000,
     items: [
-      { product_id: "prod_4", product_name: "Mie Ayam Spesial", quantity: 2, price_per_unit: 20000, total_price: 40000 },
-      { product_id: "prod_5", product_name: "Es Jeruk", quantity: 3, price_per_unit: 10000, total_price: 30000 },
+      { product: { user_id: "user_1", product_id: "prod_4", product_name: "Mie Ayam Spesial", price: 20000 }, quantity: 2, total_price: 40000 },
+      { product: { user_id: "user_1", product_id: "prod_5", product_name: "Es Jeruk", price: 10000 }, quantity: 3, total_price: 30000 },
     ],
   },
   {
@@ -36,13 +33,13 @@ let transactions: Transaction[] = [
     timestamp: "2024-11-22T16:00:00Z",
     total_price: 100000,
     items: [
-      { product_id: "prod_6", product_name: "Sate Ayam", quantity: 5, price_per_unit: 15000, total_price: 75000 },
-      { product_id: "prod_7", product_name: "Es Campur", quantity: 2, price_per_unit: 12500, total_price: 25000 },
+      { product: { user_id: "user_1", product_id: "prod_6", product_name: "Sate Ayam", price: 15000 }, quantity: 5, total_price: 75000 },
+      { product: { user_id: "user_1", product_id: "prod_7", product_name: "Es Campur", price: 12500 }, quantity: 2, total_price: 25000 },
     ],
   },
 ];
 
-let products: Product[] = [
+let products = [
   { user_id: "user_1", product_id: "prod_1", product_name: "Nasi Goreng Spesial", price: 25000 },
   { user_id: "user_1", product_id: "prod_2", product_name: "Es Teh Manis", price: 10000 },
   { user_id: "user_1", product_id: "prod_3", product_name: "Ayam Bakar", price: 45000 },
@@ -80,12 +77,14 @@ const seedTransactions = async () => {
 
     const itemsCollection = transactionDoc.collection("items");
     for (const item of transaction.items) {
-      const itemDoc = itemsCollection.doc(item.product_id);
+      const itemDoc = itemsCollection.doc(item.product.product_id);
       await itemDoc.set({
-        product_name: item.product_name,
+        product: {
+          product_name: item.product.product_name,
+          price: item.product.price,
+        },
         quantity: item.quantity,
-        price_per_unit: item.price_per_unit,
-        total_price: item.total_price
+        total_price: item.total_price,
       });
     }
 
