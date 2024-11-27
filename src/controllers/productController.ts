@@ -25,18 +25,16 @@ export const createProduct = async (req: Request, res: Response) => {
     if (!userSnapshot.exists) {
       res.status(404).json({
         status: "error",
-        message: `${user_id} not found`,
+        message: `User ${user_id} not found`,
       });
       return;
     }
 
-    // Users/products collection
     const newProduct: Product = {
       product_name,
       price,
     };
-
-    // Add product
+    // Add product, Users/products collection
     const productRef = await userDoc.collection("products").add(newProduct);
 
     const productId = productRef.id;
@@ -72,7 +70,7 @@ export const getProducts = async (req: Request, res: Response) => {
     if (!userSnapshot.exists) {
       res.status(404).json({
         status: "error",
-        message: `${user_id} not found`,
+        message: `User ${user_id} not found`,
       });
       return;
     }
@@ -80,7 +78,6 @@ export const getProducts = async (req: Request, res: Response) => {
     // Users/products collection
     const productsRef = userDoc.collection('products');
     const snapshot = await productsRef.get();
-
     // Retrieve products
     const products: Product[] = snapshot.docs.map(doc => ({
       product_id: doc.id,
@@ -122,7 +119,7 @@ export const getProductById = async (req: Request, res: Response) => {
     if (!userSnapshot.exists) {
       res.status(404).json({
         status: "error",
-        message: `${user_id} not found`,
+        message: `User ${user_id} not found`,
       });
       return;
     }
@@ -185,7 +182,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     if (!userSnapshot.exists) {
       res.status(404).json({
         status: "error",
-        message: `${user_id} not found`,
+        message: `User ${user_id} not found`,
       });
       return;
     }
@@ -195,11 +192,11 @@ export const updateProduct = async (req: Request, res: Response) => {
     const productDoc = await productRef.get();
 
     if (productDoc.exists) {
-      // Update product
       const updatedData: Partial<Product> = {
         product_name,
         price,
       };
+      // Update product
       await productRef.update(updatedData);
 
       // Retrieve updated product
@@ -242,7 +239,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
     if (!userSnapshot.exists) {
       res.status(404).json({
         status: "error",
-        message: `${user_id} not found`,
+        message: `User ${user_id} not found`,
       });
       return;
     }
