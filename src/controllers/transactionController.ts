@@ -3,31 +3,65 @@ import { firestore } from '../config/firestore';
 import axios from 'axios';
 import process from 'process';
 
+// Model
+import { Transaction } from '../models/transaction';
+
+
+interface Item {
+  product_id: string;
+  quantity: number;
+}
+
 interface MulterRequest extends Request {
   // eslint-disable-next-line no-undef
   file?: Express.Multer.File;
 }
-
-// Model
-import { Transaction } from '../models/transaction';
-
 
 // OCR transaction
 export const ocrTransaction = async (req: MulterRequest, res: Response) => {
   const { user_id } = req.body;
   const image = req.file;
 
-  if (!user_id || !image) {
-    res.status(400).json({
-      status: 'error',
-      message: 'user_id and image are required.',
+  // Validate user
+  const userDoc = firestore.collection("users").doc(user_id);
+  const userSnapshot = await userDoc.get();
+  if (!userSnapshot.exists) {
+    res.status(404).json({
+      status: "error",
+      message: `User ${user_id} not found`,
     });
     return;
   }
 
+  // Validate required fields
+  if (!image) {
+    res.status(400).json({
+      status: 'error',
+      message: 'Missing required field: image.',
+    });
+    return;
+  }
+
+  // Validate file type
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
+  if (!allowedMimeTypes.includes(image.mimetype)) {
+    res.status(400).json({
+      status: 'error',
+      message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed.',
+    });
+  }
+
+  // Validate file size
+  const maxSize = 5 * 1024 * 1024;
+  if (image.size > maxSize) {
+    res.status(400).json({
+      status: 'error',
+      message: 'File size exceeds the maximum limit of 5 MB.',
+    });
+  }
+
   try {
     const imageBuffer = image?.buffer;
-
     const formData = new FormData();
     formData.append('user_id', user_id);
     if (imageBuffer) {
@@ -63,36 +97,82 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
 
 // Create a transaction
 export const createTransaction = async (req: Request, res: Response) => {
-  const transaction: Omit<Transaction, 'transaction_id'> = req.body;
+  const { user_id, items } = req.body;
 
   // Validate required fields
-  if (!transaction.user_id || !transaction.items) {
+  if (!items || items.length === 0 || items.some((item: Item) => !item.product_id || !item.quantity)) {
     res.status(400).json({
       status: "error",
-      message: "Missing required fields: user_id or items."
+      message: "Missing required fields: items, product_id, or quantity."
     });
     return;
   }
 
   try {
-    // Generate a new transaction ID
-    const transactionsRef = firestore.collection('transactions');
-    const lastTransactionSnapshot = await transactionsRef.orderBy('timestamp', 'desc').limit(1).get();
-    const newTransactionId = lastTransactionSnapshot.empty ? 'txn_1' : `txn_${parseInt(lastTransactionSnapshot.docs[0].id.split('_')[1]) + 1}`;
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `User ${user_id} not found`,
+      });
+      return;
+    }
 
     const newTransaction: Transaction = {
-      ...transaction,
-      transaction_id: newTransactionId,
       timestamp: new Date().toISOString(),
-      total_price: transaction.items.reduce((total, item) => total + item.total_price, 0)
+      total_price: 0,
     };
 
-    await transactionsRef.doc(newTransactionId).set(newTransaction);
+    // Find items in Users/products collection
+    const productsCollection = userDoc.collection("products");
+    for (const item of items) {
+      const { product_id, quantity } = item;
+      const productDoc = await productsCollection.doc(product_id).get();
+      if (!productDoc.exists) {
+        res.status(404).json({
+          status: "error",
+          message: `Product ${product_id} not found`,
+        });
+        return;
+      }
 
+      const productData = productDoc.data();
+      if (productData) {
+        newTransaction.total_price += productData.price * quantity;
+      }
+    }
+
+    // Add transaction
+    const transactionRef = await userDoc.collection("transactions").add(newTransaction);
+
+    // Add items to transaction
+    const itemsCollection = transactionRef.collection("items");
+    for (const item of items) {
+      const { product_id, quantity } = item;
+      const productDoc = await productsCollection.doc(product_id).get();
+      const productData = productDoc.data();
+      if (productData) {
+        await itemsCollection.doc(product_id).set({
+          product: {
+            product_name: productData.product_name,
+            price: productData.price,
+          },
+          quantity,
+          total_price: productData.price * quantity,
+        });
+      }
+    }
+
+    const transactionId = transactionRef.id;
     res.status(201).json({
       status: "success",
       message: "Transaction created successfully",
-      data: newTransaction
+      data: {
+        transaction_id: transactionId,
+        ...newTransaction
+      }
     });
     return;
   } catch (error) {
@@ -109,10 +189,27 @@ export const createTransaction = async (req: Request, res: Response) => {
 
 // Get all transactions
 export const getTransactions = async (req: Request, res: Response) => {
+  const { user_id } = req.body;
   try {
-    const transactionsRef = firestore.collection('transactions');
-    const snapshot = await transactionsRef.get();
-    const transactions: Transaction[] = snapshot.docs.map(doc => doc.data() as Transaction);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `User ${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/products collection
+    const productsRef = userDoc.collection('transactions');
+    const snapshot = await productsRef.get();
+    // Retrieve transactions
+    const transactions: Transaction[] = snapshot.docs.map(doc => ({
+      transaction_id: doc.id,
+      ...doc.data() as Transaction
+    }));
 
     res.json({
       status: "success",
@@ -140,15 +237,50 @@ export const getTransactions = async (req: Request, res: Response) => {
 // Get a transaction by ID
 export const getTransactionById = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { user_id } = req.body;
+
   try {
-    const transactionRef = firestore.collection('transactions').doc(id);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `User ${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/transactions collection
+    const transactionRef = userDoc.collection('transactions').doc(id);
     const transactionDoc = await transactionRef.get();
 
     if (transactionDoc.exists) {
+      // Retrieve transaction
+      const transactionData = transactionDoc.data();
+
+      // Retrieve items
+      const itemsCollection = transactionRef.collection('items');
+      const itemsSnapshot = await itemsCollection.get();
+      if (transactionData) {
+        transactionData.items = itemsSnapshot.docs.map(doc => ({
+          product: {
+            product_id: doc.id,
+            ...doc.data().product
+          },
+          quantity: doc.data().quantity,
+          total_price: doc.data().total_price
+        }));
+      }
+
       res.json({
         status: "success",
         message: "Transaction retrieved successfully",
-        data: transactionDoc.data()
+        data: {
+          transaction: {
+            ...transactionData
+          }
+        }
       });
     } else {
       res.status(404).json({
@@ -173,19 +305,80 @@ export const getTransactionById = async (req: Request, res: Response) => {
 // Update a transaction
 export const updateTransaction = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { user_id, items } = req.body;
+
+  // Validate required fields
+  if (!items || items.length === 0 || items.some((item: Item) => !item.product_id || !item.quantity)) {
+    res.status(400).json({
+      status: "error",
+      message: "Missing required fields: items, product_id, or quantity."
+    });
+    return;
+  }
+
   try {
-    const transactionRef = firestore.collection('transactions').doc(id);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `User ${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/transactions collection
+    const transactionRef = userDoc.collection('transactions').doc(id);
     const transactionDoc = await transactionRef.get();
 
     if (transactionDoc.exists) {
-      const updatedData = req.body;
+      const updatedData: Partial<Transaction> = {
+        timestamp: new Date().toISOString(),
+        total_price: 0,
+      };
 
-      if (updatedData.items) {
-        updatedData.total_price = updatedData.items.reduce((total: number, item: { total_price: number }) => total + item.total_price, 0);
+      // Find items in Users/products collection
+      const productsCollection = userDoc.collection("products");
+      for (const item of items) {
+        const { product_id, quantity } = item;
+        const productDoc = await productsCollection.doc(product_id).get();
+        if (!productDoc.exists) {
+          res.status(404).json({
+            status: "error",
+            message: `Product ${product_id} not found`,
+          });
+          return;
+        }
+
+        const productData = productDoc.data();
+        if (productData) {
+          updatedData.total_price = (updatedData.total_price || 0) + productData.price * quantity;
+        }
       }
-
+    
+      // Update transaction
       await transactionRef.update(updatedData);
 
+      // Update items in transaction
+      const itemsCollection = transactionRef.collection("items");
+      for (const item of items) {
+        const { product_id, quantity } = item;
+        const productDoc = await productsCollection.doc(product_id).get();
+        const productData = productDoc.data();
+        if (productData) {
+          await itemsCollection.doc(product_id).set({
+            product: {
+              product_name: productData.product_name,
+              price: productData.price,
+            },
+            quantity,
+            total_price: productData.price * quantity,
+          });
+        }
+      }
+
+      // const transactionDoc = await transactionRef.get();
       res.json({
         status: "success",
         message: "Transaction updated successfully",
@@ -198,6 +391,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
         error_code: "TRANSACTION_NOT_FOUND"
       });
     }
+    return;
   } catch (error) {
     console.error("Error updating transaction:", error);
     res.status(500).json({
@@ -205,6 +399,7 @@ export const updateTransaction = async (req: Request, res: Response) => {
       message: "Failed to update transaction",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
 
@@ -212,12 +407,28 @@ export const updateTransaction = async (req: Request, res: Response) => {
 // Delete a transaction
 export const deleteTransaction = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const { user_id } = req.body;
+
   try {
-    const transactionRef = firestore.collection('transactions').doc(id);
+    // Users document
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `User ${user_id} not found`,
+      });
+      return;
+    }
+
+    // Users/transactions collection
+    const transactionRef = userDoc.collection('transactions').doc(id);
     const transactionDoc = await transactionRef.get();
 
     if (transactionDoc.exists) {
+      // Delete transaction
       await transactionRef.delete();
+
       res.status(204).send();
     } else {
       res.status(404).json({
@@ -226,6 +437,7 @@ export const deleteTransaction = async (req: Request, res: Response) => {
         error_code: "TRANSACTION_NOT_FOUND"
       });
     }
+    return;
   } catch (error) {
     console.error("Error deleting transaction:", error);
     res.status(500).json({
@@ -233,5 +445,6 @@ export const deleteTransaction = async (req: Request, res: Response) => {
       message: "Failed to delete transaction",
       error: (error instanceof Error) ? error.message : 'Unknown error'
     });
+    return;
   }
 };
