@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
 import { firestore } from '../config/firestore';
+import axios from 'axios';
+import process from 'process';
 
 // Model
 import { Product } from '../models/product';
-
 
 // Create a product
 export const createProduct = async (req: Request, res: Response) => {
@@ -30,10 +31,30 @@ export const createProduct = async (req: Request, res: Response) => {
       return;
     }
 
+    const formData = new FormData();
+    formData.append('product_name', product_name);
+
+    // Get embeddings
+    const response = await axios.post(
+      `${process.env.OCR_API_URL}/api/v1/embeddings/inference`,
+      formData
+    );
+
+    if (!response.data || !response.data.status || response.data.status != "success") {
+      res.status(500).json({
+        status: "error",
+        message: "Failed to create product",
+        error: response.data.message || 'Unknown error'
+      });
+      return;
+    }
+
     const newProduct: Product = {
       product_name,
       price,
+      embeddings: response.data.data.embeddings,
     };
+  
     // Add product, Users/products collection
     const productRef = await userDoc.collection("products").add(newProduct);
 
