@@ -83,7 +83,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       status: 'success',
       message: 'Login successful',
       token: `Bearer ${idToken}`,
-      user: decodedToken,
+      exp: decodedToken.exp,
     });
     return;
   } catch (error) {
