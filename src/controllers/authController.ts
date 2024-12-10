@@ -135,7 +135,16 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
 // Update user details
 export const updateUser = async (req: Request, res: Response): Promise<void> => {
   const { user_id } = req.body;
-  const { name, email, address } = req.body;
+  const { name, address } = req.body;
+
+  // Validate input
+  if (!name || !address) {
+    res.status(400).json({
+      status: 'error',
+      message: 'All fields (name, address) are required.',
+    });
+    return
+  }
 
   try {
     // Users document
@@ -152,7 +161,7 @@ export const updateUser = async (req: Request, res: Response): Promise<void> => 
     // Update user details
     const userUpdate = {
       name,
-      email,
+      email: userSnapshot.data()?.email,
       address,
     };
     await userDoc.update(userUpdate);
