@@ -204,36 +204,60 @@ export const getTransactions = async (req: Request, res: Response) => {
       return;
     }
 
-    // Users/products collection
-    const productsRef = userDoc.collection('transactions');
-    const snapshot = await productsRef.get();
-    // Retrieve transactions
-    const transactions: Transaction[] = snapshot.docs.map(doc => ({
-      transaction_id: doc.id,
-      ...doc.data() as Transaction
-    }));
+    // Transactions subcollection
+    const transactionsRef = userDoc.collection('transactions');
+    const transactionsSnapshot = await transactionsRef.get();
+
+    // Retrieve transactions and their items
+    const transactions = await Promise.all(
+      transactionsSnapshot.docs.map(async (transactionDoc) => {
+        const transactionData = transactionDoc.data();
+        const itemsRef = transactionDoc.ref.collection('items');
+        const itemsSnapshot = await itemsRef.get();
+
+        // Retrieve items for each transaction
+        const items = itemsSnapshot.docs.map((itemDoc) => {
+          const itemData = itemDoc.data();
+          return {
+            product_id: itemDoc.id,
+            product_name: itemData.product_name || '',
+            price_per_unit: itemData.price_per_unit || 0,
+            quantity: itemData.quantity || 0,
+            total_price: itemData.total_price || 0,
+          };
+        });
+
+        return {
+          transaction_id: transactionDoc.id,
+          timestamp: transactionData.timestamp || null,
+          total_price: transactionData.total_price || 0,
+          items,
+        };
+      })
+    );
 
     res.json({
       status: "success",
       message: "Transactions retrieved successfully",
       data: {
-        transactions: transactions,
+        transactions,
         meta: {
-          total: transactions.length
-        }
-      }
+          total: transactions.length,
+        },
+      },
     });
-    return;
+    return
   } catch (error) {
     console.error("Error retrieving transactions:", error);
     res.status(500).json({
       status: "error",
       message: "Failed to retrieve transactions",
-      error: (error instanceof Error) ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
-    return;
+    return
   }
 };
+
 
 
 // Get a transaction by ID
