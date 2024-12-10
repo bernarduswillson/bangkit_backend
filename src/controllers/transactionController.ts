@@ -34,7 +34,7 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
   }
 
   // Validate required fields
-  if (!image) {
+  if (!image || !image.buffer) {
     res.status(400).json({
       status: 'error',
       message: 'Missing required field: image.',
@@ -43,12 +43,13 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
   }
 
   // Validate file type
-  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
   if (!allowedMimeTypes.includes(image.mimetype)) {
     res.status(400).json({
       status: 'error',
-      message: 'Invalid file type. Only JPEG, PNG, and GIF are allowed.',
+      message: 'Invalid file type. Only JPEG, PNG, and JPG are allowed.',
     });
+    return;
   }
 
   // Validate file size
@@ -58,6 +59,7 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
       status: 'error',
       message: 'File size exceeds the maximum limit of 5 MB.',
     });
+    return;
   }
 
   try {
