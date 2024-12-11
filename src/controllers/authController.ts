@@ -96,6 +96,54 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+// Login with Google
+export const loginGoogle = async (req: Request, res: Response): Promise<void> => {
+  const { token } = req.body;
+
+  // Validate input
+  if (!token) {
+    res.status(400).json({
+      status: 'error',
+      message: 'Google token is required.',
+    });
+    return;
+  }
+
+  try {
+    // Verify the ID token
+    const decodedToken = await verifyIdToken(token);
+
+    // Users/products collection
+    const userDoc = firestore.collection('users').doc(decodedToken.user_id);
+    // Retrieve user details
+    const userSnapshot = await userDoc.get();
+    // Create new user if not exists
+    if (!userSnapshot.exists) {
+      const newUser : User = {
+        name: decodedToken.name,
+        email: decodedToken.email || '',
+        address: 'Address not provided',
+      };
+      await userDoc.set(newUser);
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Login successful',
+      token: `Bearer ${token}`,
+      exp: decodedToken.exp,
+    });
+    return;
+  } catch (error) {
+    console.error("Error during login with Google:", error);
+    res.status(401).json({
+      status: 'error',
+      message: 'Invalid Google token.',
+    });
+    return;
+  }
+};
+
 // Get user details
 export const getUser = async (req: Request, res: Response): Promise<void> => {
   const { user_id } = req.body;
