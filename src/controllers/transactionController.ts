@@ -96,6 +96,43 @@ export const ocrTransaction = async (req: MulterRequest, res: Response) => {
   }
 };
 
+// Omset prediction
+export const omsetPrediction = async (req: Request, res: Response) => {
+  const { user_id } = req.body;
+
+  // Validate user
+  const userDoc = firestore.collection("users").doc(user_id);
+  const userSnapshot = await userDoc.get();
+  if (!userSnapshot.exists) {
+    res.status(404).json({
+      status: "error",
+      message: `User ${user_id} not found`,
+    });
+    return;
+  }
+
+  try {
+    // Send image to OCR API
+    const response = await axios.get(
+      `${process.env.TF_API_URL}/predict/${user_id}`
+    );
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Success get omset prediction.',
+      data: response.data,
+    });
+    return;
+  } catch (error) {
+    console.error('Error in OCR transaction:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to get omset prediction.',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return;
+  }
+};
 
 // Create a transaction
 export const createTransaction = async (req: Request, res: Response) => {
