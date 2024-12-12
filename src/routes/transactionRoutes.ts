@@ -22,6 +22,6 @@ router.get('/dashboard/top-5-products', authMiddleware, getTop5Products);
 router.get('/:id', authMiddleware, getTransactionById);
 router.put('/:id', authMiddleware, updateTransaction);
 router.delete('/:id', authMiddleware, deleteTransaction);
-router.post('/ocr', authMiddleware, upload.single('image'), ocrTransaction);
+router.post('/ocr', upload.single('image'), authMiddleware, ocrTransaction);
 
 export default router;
