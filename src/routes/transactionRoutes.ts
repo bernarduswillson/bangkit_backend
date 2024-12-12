@@ -10,6 +10,7 @@ import {
   getTransactionById,
   updateTransaction,
   deleteTransaction,
+  getTop5Products,
 } from '../controllers/transactionController';
 
 const router = Router();
@@ -17,9 +18,10 @@ const router = Router();
 // Routes
 router.post('/', authMiddleware, createTransaction);
 router.get('/', authMiddleware, getTransactions);
+router.get('/dashboard/top-5-products', authMiddleware, getTop5Products);
 router.get('/:id', authMiddleware, getTransactionById);
 router.put('/:id', authMiddleware, updateTransaction);
 router.delete('/:id', authMiddleware, deleteTransaction);
-router.post('/ocr', upload.single('image'), authMiddleware, ocrTransaction);
+router.post('/ocr', authMiddleware, upload.single('image'), ocrTransaction);
 
 export default router;

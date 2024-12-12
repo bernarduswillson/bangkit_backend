@@ -258,6 +258,68 @@ export const getTransactions = async (req: Request, res: Response) => {
   }
 };
 
+// Get top 5 products
+export const getTop5Products = async (req: Request, res: Response) => {
+  const { user_id } = req.body;
+  try {
+    const userDoc = firestore.collection("users").doc(user_id);
+    const userSnapshot = await userDoc.get();
+    if (!userSnapshot.exists) {
+      res.status(404).json({
+        status: "error",
+        message: `User ${user_id} not found`,
+      });
+      return;
+    }
+
+    const transactionsRef = userDoc.collection("transactions");
+    const transactionsSnapshot = await transactionsRef.get();
+
+    const productQuantities: Record<string, { product_name: string; total_quantity: number }> = {};
+
+    await Promise.all(
+      transactionsSnapshot.docs.map(async (transactionDoc) => {
+        const itemsRef = transactionDoc.ref.collection("items");
+        const itemsSnapshot = await itemsRef.get();
+
+        itemsSnapshot.docs.forEach((itemDoc) => {
+          const itemData = itemDoc.data();
+          const productId = itemDoc.id;
+
+          if (!productQuantities[productId]) {
+            productQuantities[productId] = {
+              product_name: itemData.product_name || "",
+              total_quantity: 0,
+            };
+          }
+          productQuantities[productId].total_quantity += itemData.quantity || 0;
+        });
+      })
+    );
+
+    const topProducts = Object.entries(productQuantities)
+      .map(([product_id, data]) => ({
+        product_id,
+        product_name: data.product_name,
+        total_quantity: data.total_quantity,
+      }))
+      .sort((a, b) => b.total_quantity - a.total_quantity)
+      .slice(0, 5);
+
+    res.json({
+      status: "success",
+      message: "Top 5 products retrieved successfully",
+      data: topProducts,
+    });
+  } catch (error) {
+    console.error("Error retrieving top 5 products:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to retrieve top 5 products",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
 
 
 // Get a transaction by ID
